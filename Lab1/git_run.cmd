@@ -7,6 +7,5 @@ mkdir build
 cd build
 cmake ..
 cmake --build .
-pause
 cd ..
 app.exe
