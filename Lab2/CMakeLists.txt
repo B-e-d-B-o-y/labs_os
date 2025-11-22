@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_subdirectory(library)
 
-set(EXAMPLE_NAME example)
-add_executable(${EXAMPLE_NAME} example.c++)
+set(EXAMPLE_NAME test)
+add_executable(${EXAMPLE_NAME} test.c++)
 
 target_link_libraries(${EXAMPLE_NAME} PRIVATE library)
