@@ -1,7 +1,7 @@
 set(LIBRARY_NAME library)
 
 set(SRC_FILES
-    library.cpp # основной исходник для реализации на C++
+    library.c++ # основной исходник для реализации на C++
 )
 
 add_library(${LIBRARY_NAME} STATIC ${SRC_FILES})
