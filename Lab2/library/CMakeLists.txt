@@ -1,3 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(Library LANGUAGES CXX)
 # Устанавливается имя библиотеки для использования в дальнейшем
 set(LIBRARY_NAME library)
 # Список исходных файлов для библиотеки
@@ -7,5 +9,3 @@ add_library(${LIBRARY_NAME} STATIC ${SRC_FILES})
 # Добавляется директория (текущая папка) к путям поиска заголовочных файлов для библиотеки.
 # PUBLIC означает, что этот путь будет виден всем, кто подключает эту библиотеку.
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# Указываем публичный хедер
-set_target_properties(${LIBRARY_NAME} PROPERTIES PUBLIC_HEADER library.h++)
