@@ -1,22 +1,11 @@
+# Устанавливается имя библиотеки для использования в дальнейшем
 set(LIBRARY_NAME library)
-
-set(SRC_FILES
-    library.c++ # основной исходник для реализации на C++
-)
-
+# Список исходных файлов для библиотеки
+set(SRC_FILES library.c++)
+# Создаётся статическая библиотека с заданным именем и исходниками
 add_library(${LIBRARY_NAME} STATIC ${SRC_FILES})
-
+# Добавляется директория (текущая папка) к путям поиска заголовочных файлов для библиотеки.
+# PUBLIC означает, что этот путь будет виден всем, кто подключает эту библиотеку.
 target_include_directories(${LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
-set_target_properties(${LIBRARY_NAME} PROPERTIES
-    PUBLIC_HEADER library.hpp # здесь указывайте нужный публичный хедер для пользователей
-)
-
-install(TARGETS ${LIBRARY_NAME}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    PUBLIC_HEADER DESTINATION include
-)
-
-install(FILES library.hpp DESTINATION include)
+# Указываем публичный хедер
+set_target_properties(${LIBRARY_NAME} PROPERTIES PUBLIC_HEADER library.h++)

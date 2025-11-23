@@ -1,4 +1,4 @@
-// library.cpp
+// library.c++
 #include "library.h++"
 #include <cstdlib>
 #include <cstring>
