@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <string>
+#include <cstring>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -234,9 +235,9 @@ int main(int argc, char* argv[]) {
 
         // Если процесс запущен как копия
         if (argc > 1) {
-            if (std::strcmp(argv[1], "--copy1") == 0) {
+            if (strcmp(argv[1], "--copy1") == 0) {
                 handle_copy_1();
-            } else if (std::strcmp(argv[1], "--copy2") == 0) {
+            } else if (strcmp(argv[1], "--copy2") == 0) {
                 handle_copy_2();
             }
         }
