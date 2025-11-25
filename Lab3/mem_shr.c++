@@ -1,5 +1,3 @@
-#pragma once  // Защита от повторного включения заголовка (аналог include guard)
-
 #include <string>       // std::string для имён объектов
 #include <stdexcept>    // std::runtime_error для ошибок
 #include <cstring>      // std::memset для обнуления структуры
