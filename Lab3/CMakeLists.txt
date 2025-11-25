@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(prog
-    myprog.c++
+    prog.c++
     time_log.c++
     thr.c++
     sem_mng.c++
