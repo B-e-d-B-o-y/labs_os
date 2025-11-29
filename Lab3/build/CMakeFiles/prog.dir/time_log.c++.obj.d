@@ -149,6 +149,8 @@ CMakeFiles/prog.dir/time_log.c++.obj: D:\labs_os\Lab3\time_log.c++ \
  C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/basic_file.h \
  C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++io.h \
  C:/mingw64/include/c++/15.2.0/bits/fstream.tcc \
+ C:/mingw64/include/c++/15.2.0/sstream \
+ C:/mingw64/include/c++/15.2.0/bits/sstream.tcc \
  C:/mingw64/include/c++/15.2.0/chrono \
  C:/mingw64/include/c++/15.2.0/bits/chrono.h \
  C:/mingw64/include/c++/15.2.0/ratio \
@@ -165,8 +167,6 @@ CMakeFiles/prog.dir/time_log.c++.obj: D:\labs_os\Lab3\time_log.c++ \
  C:/mingw64/include/c++/15.2.0/bits/locale_facets_nonio.tcc \
  C:/mingw64/include/c++/15.2.0/bits/locale_conv.h \
  C:/mingw64/include/c++/15.2.0/bits/quoted_string.h \
- C:/mingw64/include/c++/15.2.0/sstream \
- C:/mingw64/include/c++/15.2.0/bits/sstream.tcc \
  C:/mingw64/x86_64-w64-mingw32/include/windows.h \
  C:/mingw64/x86_64-w64-mingw32/include/sdkddkver.h \
  C:/mingw64/x86_64-w64-mingw32/include/excpt.h \
@@ -434,4 +434,4 @@ CMakeFiles/prog.dir/time_log.c++.obj: D:\labs_os\Lab3\time_log.c++ \
  C:/mingw64/x86_64-w64-mingw32/include/sec_api/stralign_s.h \
  C:/mingw64/x86_64-w64-mingw32/include/winsvc.h \
  C:/mingw64/x86_64-w64-mingw32/include/mcx.h \
- C:/mingw64/x86_64-w64-mingw32/include/imm.h
+ C:/mingw64/x86_64-w64-mingw32/include/imm.h D:\labs_os\Lab3\time_log.hpp
