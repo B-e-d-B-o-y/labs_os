@@ -1,8 +1,7 @@
 #include <string>       // std::string для имён объектов
 #include <stdexcept>    // std::runtime_error для ошибок
 #include <cstring>      // std::memset для обнуления структуры
-#include "mem_shr.hpp"  // Подключаем заголовок
-#include "sem_mng.hpp"  // Подключаем заголовок для SharedSemaphore
+#include "mem_shr.hpp"  // Подключаем заголовок (в котором теперь есть sem_mng.hpp)
 
 #ifdef _WIN32
 #include <windows.h>    // WinAPI: CreateFileMapping, MapViewOfFile, CreateSemaphore и т.д.
@@ -108,6 +107,3 @@ void SharedMemory::set_zero() {
     if (!data_) return;
     std::memset(data_, 0, sizeof(SharedMemoryData));
 }
-
-// --- Реализация класса SharedSemaphore (перенесена из mem_shr.c++ в sem_mng.c++) ---
-// Эта часть будет реализована в sem_mng.c++

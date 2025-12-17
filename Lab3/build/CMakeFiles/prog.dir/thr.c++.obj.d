@@ -372,4 +372,4 @@ CMakeFiles/prog.dir/thr.c++.obj: D:\labs_os\Lab3\thr.c++ \
  C:/mingw64/include/c++/15.2.0/cstddef \
  C:/mingw64/include/c++/15.2.0/bits/uses_allocator.h \
  C:/mingw64/include/c++/15.2.0/bits/uses_allocator_args.h \
- C:/mingw64/include/c++/15.2.0/tuple
+ C:/mingw64/include/c++/15.2.0/tuple D:\labs_os\Lab3\thr.hpp

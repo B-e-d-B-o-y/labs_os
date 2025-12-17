@@ -27,8 +27,8 @@ private:
 #endif
 };
 
-// Объявляем вперёд, определение в sem_mng.hpp
-class SharedSemaphore;
+// Подключаем заголовок с определением SharedSemaphore ДО inline-функций
+#include "sem_mng.hpp"
 
 // Объявления inline-функций
 int get_counter(SharedMemoryData* memory, SharedSemaphore& sem);

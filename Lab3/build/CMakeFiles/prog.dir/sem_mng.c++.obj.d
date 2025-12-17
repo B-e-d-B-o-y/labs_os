@@ -1,5 +1,5 @@
 CMakeFiles/prog.dir/sem_mng.c++.obj: D:\labs_os\Lab3\sem_mng.c++ \
- C:/mingw64/include/c++/15.2.0/string \
+ D:\labs_os\Lab3\sem_mng.hpp C:/mingw64/include/c++/15.2.0/string \
  C:/mingw64/include/c++/15.2.0/bits/requires_hosted.h \
  C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/c++config.h \
  C:/mingw64/include/c++/15.2.0/x86_64-w64-mingw32/bits/os_defines.h \
@@ -98,12 +98,6 @@ CMakeFiles/prog.dir/sem_mng.c++.obj: D:\labs_os\Lab3\sem_mng.c++ \
  C:/mingw64/include/c++/15.2.0/bits/uses_allocator.h \
  C:/mingw64/include/c++/15.2.0/bits/uses_allocator_args.h \
  C:/mingw64/include/c++/15.2.0/tuple \
- C:/mingw64/include/c++/15.2.0/stdexcept \
- C:/mingw64/include/c++/15.2.0/exception \
- C:/mingw64/include/c++/15.2.0/bits/exception_ptr.h \
- C:/mingw64/include/c++/15.2.0/bits/cxxabi_init_exception.h \
- C:/mingw64/include/c++/15.2.0/typeinfo \
- C:/mingw64/include/c++/15.2.0/bits/nested_exception.h \
  C:/mingw64/x86_64-w64-mingw32/include/windows.h \
  C:/mingw64/x86_64-w64-mingw32/include/sdkddkver.h \
  C:/mingw64/x86_64-w64-mingw32/include/excpt.h \
@@ -372,4 +366,10 @@ CMakeFiles/prog.dir/sem_mng.c++.obj: D:\labs_os\Lab3\sem_mng.c++ \
  C:/mingw64/x86_64-w64-mingw32/include/sec_api/stralign_s.h \
  C:/mingw64/x86_64-w64-mingw32/include/winsvc.h \
  C:/mingw64/x86_64-w64-mingw32/include/mcx.h \
- C:/mingw64/x86_64-w64-mingw32/include/imm.h
+ C:/mingw64/x86_64-w64-mingw32/include/imm.h \
+ C:/mingw64/include/c++/15.2.0/stdexcept \
+ C:/mingw64/include/c++/15.2.0/exception \
+ C:/mingw64/include/c++/15.2.0/bits/exception_ptr.h \
+ C:/mingw64/include/c++/15.2.0/bits/cxxabi_init_exception.h \
+ C:/mingw64/include/c++/15.2.0/typeinfo \
+ C:/mingw64/include/c++/15.2.0/bits/nested_exception.h

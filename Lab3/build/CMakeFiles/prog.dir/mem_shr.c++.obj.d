@@ -107,6 +107,7 @@ CMakeFiles/prog.dir/mem_shr.c++.obj: D:\labs_os\Lab3\mem_shr.c++ \
  C:/mingw64/include/c++/15.2.0/cstring \
  C:/mingw64/x86_64-w64-mingw32/include/string.h \
  C:/mingw64/x86_64-w64-mingw32/include/sec_api/string_s.h \
+ D:\labs_os\Lab3\mem_shr.hpp D:\labs_os\Lab3\sem_mng.hpp \
  C:/mingw64/x86_64-w64-mingw32/include/windows.h \
  C:/mingw64/x86_64-w64-mingw32/include/sdkddkver.h \
  C:/mingw64/x86_64-w64-mingw32/include/excpt.h \
