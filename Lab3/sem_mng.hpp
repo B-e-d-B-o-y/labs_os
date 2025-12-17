@@ -1,7 +1,5 @@
 #pragma once
-
 #include <string>
-
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -15,14 +13,13 @@ public:
     SharedSemaphore(const SharedSemaphore&) = delete;
     SharedSemaphore& operator=(const SharedSemaphore&) = delete;
     ~SharedSemaphore();
-
     void wait();   // захват
     void signal(); // освобождение
 
 private:
     std::string name_;
 #ifdef _WIN32
-    void* hSemaphore_ = nullptr; // HANDLE, в .c++ сделаешь правильный тип
+    void* hSemaphore_ = nullptr; // HANDLE, будет исправлено в .c++
 #else
     sem_t* sem_ = nullptr;
 #endif
