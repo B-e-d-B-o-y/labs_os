@@ -1,7 +1,9 @@
+// D:\labs_os\Lab3\mem_shr.c++ (Linux version)
 #include <string>       // std::string для имён объектов
 #include <stdexcept>    // std::runtime_error для ошибок
 #include <cstring>      // std::memset для обнуления структуры
 #include "mem_shr.hpp"  // Подключаем заголовок (в котором теперь есть sem_mng.hpp)
+#include "sem_mng.hpp"  // Подключаем заголовок для SharedSemaphore
 
 #ifdef _WIN32
 #include <windows.h>    // WinAPI: CreateFileMapping, MapViewOfFile, CreateSemaphore и т.д.
@@ -15,8 +17,9 @@
 #include <errno.h>      // errno для ошибок POSIX
 #endif
 
+// --- Реализация методов класса SharedMemory ---
+// (Все методы должны быть объявлены в mem_shr.hpp)
 
-// --- Реализация класса SharedMemory ---
 SharedMemory::SharedMemory(const std::string& name)
     : name_(name)
 {
@@ -77,10 +80,6 @@ SharedMemory::SharedMemory(const std::string& name)
 #endif
 }
 
-// Копирование запрещаем, чтобы случайно не дублировать владение ресурсами
-// SharedMemory(const SharedMemory&) = delete;
-// SharedMemory& operator=(const SharedMemory&) = delete;
-
 // Деструктор освобождает ресурсы
 SharedMemory::~SharedMemory() {
 #ifdef _WIN32
@@ -107,3 +106,22 @@ void SharedMemory::set_zero() {
     if (!data_) return;
     std::memset(data_, 0, sizeof(SharedMemoryData));
 }
+
+// --- Реализация методов класса SharedSemaphore (если она была здесь) ---
+// Убедитесь, что она реализована в sem_mng.c++, а не здесь.
+// Эта часть должна быть УДАЛЕНА из mem_shr.c++:
+/*
+class SharedSemaphore {
+public:
+    explicit SharedSemaphore(const std::string& name) { ... }
+    // ...
+};
+*/
+// --- Реализация inline-функций (это не нужно делать, они inline в .hpp) ---
+// Удалите эти функции из .c++, они должны быть в .hpp:
+/*
+inline int get_counter(SharedMemoryData* memory, SharedSemaphore& sem) { ... }
+inline void set_counter(SharedMemoryData* memory, SharedSemaphore& sem, int value) { ... }
+inline void increment_counter(SharedMemoryData* memory, SharedSemaphore& sem) { ... }
+inline void set_zero_shared_memory(SharedMemoryData* memory, SharedSemaphore& sem) { ... }
+*/

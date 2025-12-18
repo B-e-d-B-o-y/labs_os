@@ -1,3 +1,4 @@
+// D:\labs_os\Lab3\sem_mng.c++ (Linux version)
 #include "sem_mng.hpp"  // Подключаем заголовок
 #include <string>
 #include <stdexcept>
@@ -9,7 +10,7 @@
 #include <errno.h>
 #endif
 
-// --- Реализация класса SharedSemaphore ---
+// --- Реализация методов класса SharedSemaphore ---
 SharedSemaphore::SharedSemaphore(const std::string& name)
     : name_(name)
 {

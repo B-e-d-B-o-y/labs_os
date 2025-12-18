@@ -1,3 +1,4 @@
+// D:\labs_os\Lab3\sem_mng.hpp
 #pragma once
 #include <string>
 #ifdef _WIN32
@@ -19,7 +20,7 @@ public:
 private:
     std::string name_;
 #ifdef _WIN32
-    void* hSemaphore_ = nullptr; // HANDLE, будет исправлено в .c++
+    void* hSemaphore_ = nullptr; // HANDLE
 #else
     sem_t* sem_ = nullptr;
 #endif

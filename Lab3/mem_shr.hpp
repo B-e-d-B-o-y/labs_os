@@ -1,3 +1,4 @@
+// D:\labs_os\Lab3\mem_shr.hpp
 #pragma once
 #include <string>
 
@@ -19,11 +20,9 @@ public:
 
 private:
     std::string name_;
-    SharedMemoryData* data_ = nullptr;
+    SharedMemoryData* data_ = nullptr; // Указатель на структуру данных
 #ifdef _WIN32
     void* hMapFile_ = nullptr; // HANDLE
-#else
-    void* data_ = nullptr; // Указатель на mapped region (void* или SharedMemoryData*)
 #endif
 };
 
