@@ -1,4 +1,3 @@
-// D:\labs_os\Lab3\sem_mng.c++ (Linux version)
 #include "sem_mng.hpp"  // Подключаем заголовок
 #include <string>
 #include <stdexcept>
@@ -35,9 +34,6 @@ SharedSemaphore::SharedSemaphore(const std::string& name)
 #endif
 }
 
-// Семафор тоже нельзя копировать (это ресурс ОС)
-// SharedSemaphore(const SharedSemaphore&) = delete;
-// SharedSemaphore& operator=(const SharedSemaphore&) = delete;
 
 SharedSemaphore::~SharedSemaphore() {
 #ifdef _WIN32
@@ -52,7 +48,7 @@ SharedSemaphore::~SharedSemaphore() {
 #endif
 }
 
-// Захват семафора (вход в критическую секцию)
+// Захват семафора
 void SharedSemaphore::wait() {
 #ifdef _WIN32
     DWORD res = WaitForSingleObject(hSemaphore_, INFINITE);
@@ -67,7 +63,7 @@ void SharedSemaphore::wait() {
 #endif
 }
 
-// Освобождение семафора (выход из критической секции)
+// Освобождение семафора 
 void SharedSemaphore::signal() {
 #ifdef _WIN32
     if (!ReleaseSemaphore(hSemaphore_, 1, nullptr)) {

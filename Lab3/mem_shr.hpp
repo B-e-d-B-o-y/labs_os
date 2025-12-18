@@ -1,4 +1,3 @@
-// D:\labs_os\Lab3\mem_shr.hpp
 #pragma once
 #include <string>
 

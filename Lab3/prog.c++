@@ -82,7 +82,7 @@ void* input_thread(void* /*arg*/) {
     return nullptr;
 }
 
-// Обработка SIGINT (Ctrl+C)
+// Обработка SIGINT 
 void handle_signal(int /*sig*/) {
     std::printf("Shutdown...\n");
     try {
@@ -190,7 +190,7 @@ void handle_copy_1() {
     auto* data = g_shared_memory->get();
     do_log("(Copy1) Started");
     increment_counter(data, *g_sem_master); // +1
-    // по условию у тебя было +10 — можно сделать отдельную функцию
+    
     for (int i = 0; i < 9; ++i) {
         increment_counter(data, *g_sem_master);
     }

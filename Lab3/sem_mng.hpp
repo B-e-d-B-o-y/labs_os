@@ -1,4 +1,3 @@
-// D:\labs_os\Lab3\sem_mng.hpp
 #pragma once
 #include <string>
 #ifdef _WIN32
