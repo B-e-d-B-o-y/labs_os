@@ -8,13 +8,15 @@
 #include <chrono>
 #include <fstream>
 
-#ifdef _WIN32
-#include <windows.h>  
-#endif
-
 const std::string MEASUREMENTS_FILE = "measurements.log";
 const std::string HOURLY_FILE = "hourly_average.log";
 const std::string DAILY_FILE = "daily_average.log";
+
+// Глобальные переменные для усреднения и очистки
+static std::vector<float> hourlyBuffer;
+static time_t lastCleanup = 0;        // последняя очистка measurements.log
+static time_t lastHourlyCleanup = 0;  // последняя очистка hourly_average.log
+static time_t lastDailyCleanup = 0;   // последняя очистка daily_average.log
 
 time_t getCurrentTime() {
     return std::time(nullptr);
@@ -39,158 +41,142 @@ std::vector<std::pair<time_t, float>> readLogFile(const std::string& filename) {
     return data;
 }
 
-void writeFilteredLog(const std::string& filename, const std::vector<std::pair<time_t, float>>& all, time_t now, time_t maxAgeSec) {
+void cleanupMeasurementsLog(time_t now) {
+    auto all = readLogFile(MEASUREMENTS_FILE);
     std::vector<std::pair<time_t, float>> valid;
     for (const auto& [ts, val] : all) {
-        if (now - ts <= maxAgeSec) {
+        if (now - ts <= 24 * 3600) {
             valid.emplace_back(ts, val);
         }
     }
-
-    std::ofstream out(filename, std::ios::trunc);
+    std::ofstream out(MEASUREMENTS_FILE, std::ios::trunc);
     for (const auto& [ts, val] : valid) {
         out << ts << " " << val << "\n";
     }
+    lastCleanup = now;
 }
 
-void writeYearFilteredLog(const std::string& filename, const std::vector<std::pair<time_t, float>>& all, int currentYear) {
+void cleanupHourlyLog(time_t now) {
+    auto all = readLogFile(HOURLY_FILE);
+    std::vector<std::pair<time_t, float>> valid;
+    for (const auto& [ts, val] : all) {
+        if (now - ts <= 30 * 24 * 3600) {
+            valid.emplace_back(ts, val);
+        }
+    }
+    std::ofstream out(HOURLY_FILE, std::ios::trunc);
+    for (const auto& [ts, val] : valid) {
+        out << ts << " " << val << "\n";
+    }
+    lastHourlyCleanup = now;
+}
+
+void cleanupDailyLog(time_t now) {
+    int year = getCurrentYear();
+    auto all = readLogFile(DAILY_FILE);
     std::vector<std::pair<time_t, float>> valid;
     for (const auto& [ts, val] : all) {
         std::tm* tm = std::localtime(&ts);
-        int year = tm->tm_year + 1900;
-        if (year == currentYear) {
+        if (tm->tm_year + 1900 == year) {
             valid.emplace_back(ts, val);
         }
     }
-
-    std::ofstream out(filename, std::ios::trunc);
+    std::ofstream out(DAILY_FILE, std::ios::trunc);
     for (const auto& [ts, val] : valid) {
         out << ts << " " << val << "\n";
     }
+    lastDailyCleanup = now;
 }
 
+// Основная запись измерения — БЕЗ полной перезаписи!
 void logMeasurement(float temp) {
     time_t now = getCurrentTime();
-    auto all = readLogFile(MEASUREMENTS_FILE);
-    writeFilteredLog(MEASUREMENTS_FILE, all, now, 24 * 3600);
+    // Просто дописываем в конец
     std::ofstream out(MEASUREMENTS_FILE, std::ios::app);
     out << now << " " << temp << "\n";
+
+    // Обрезаем раз в час (3600 сек)
+    if (now - lastCleanup >= 3600 || lastCleanup == 0) {
+        cleanupMeasurementsLog(now);
+    }
 }
 
 void logHourlyAverage(float avg) {
     time_t now = getCurrentTime();
-    auto all = readLogFile(HOURLY_FILE);
-    writeFilteredLog(HOURLY_FILE, all, now, 30 * 24 * 3600);
     std::ofstream out(HOURLY_FILE, std::ios::app);
     out << now << " " << avg << "\n";
+
+    // Обрезаем раз в 6 часов (можно и реже)
+    if (now - lastHourlyCleanup >= 6 * 3600 || lastHourlyCleanup == 0) {
+        cleanupHourlyLog(now);
+    }
 }
 
 void logDailyAverage(float avg) {
-    int year = getCurrentYear();
-    auto all = readLogFile(DAILY_FILE);
-    writeYearFilteredLog(DAILY_FILE, all, year);
-    std::ofstream out(DAILY_FILE, std::ios::app);
-    out << getCurrentTime() << " " << avg << "\n";
-}
-
-// === Вспомогательная функция: среднее за вчерашний день ===
-float calculateYesterdayDailyAverage() {
     time_t now = getCurrentTime();
-    std::tm* today = std::localtime(&now);
-    int yday = today->tm_yday;
-    int year = today->tm_year + 1900;
+    std::ofstream out(DAILY_FILE, std::ios::app);
+    out << now << " " << avg << "\n";
 
-
-    auto hourlyData = readLogFile(HOURLY_FILE);
-    std::vector<float> yesterdayTemps;
-
-    for (const auto& [ts, temp] : hourlyData) {
-        std::tm* tm = std::localtime(&ts);
-        if (tm->tm_year + 1900 == year && tm->tm_yday == yday - 1) {
-            yesterdayTemps.push_back(temp);
-        }
+    // Обрезаем раз в день
+    if (now - lastDailyCleanup >= 24 * 3600 || lastDailyCleanup == 0) {
+        cleanupDailyLog(now);
     }
-
-    if (yesterdayTemps.empty()) return 0.0f;
-
-    float sum = 0.0f;
-    for (float t : yesterdayTemps) sum += t;
-    return sum / static_cast<float>(yesterdayTemps.size());
 }
 
-// === Основная логика ===
+static int totalMeasurements = 0;
+
+void processTemperature(float temp) {
+    time_t now = getCurrentTime();
+    logMeasurement(temp);
+    totalMeasurements++;
+
+    hourlyBuffer.push_back(temp);
+
+    if (hourlyBuffer.size() >= 60) {
+        float sum = 0.0f;
+        for (float t : hourlyBuffer) sum += t;
+        float hourlyAvg = sum / static_cast<float>(hourlyBuffer.size());
+
+        logHourlyAverage(hourlyAvg);
+        std::cout << "[Hourly avg] " << hourlyAvg << " C\n";
+
+        static int hourlyBlocks = 0;
+        hourlyBlocks++;
+        if (hourlyBlocks >= 24) {
+            logDailyAverage(hourlyAvg);
+            std::cout << "[Daily avg] " << hourlyAvg << " C\n";
+            hourlyBlocks = 0;
+        }
+
+        hourlyBuffer.clear();
+    }
+}
+
 int main() {
-#ifdef _WIN32
-    SetConsoleOutputCP(CP_UTF8); 
-#endif
-    const std::string PORT_NAME = 
+    const std::string PORT_NAME =
 #ifdef _WIN32
         "COM5";
 #else
-        "/dev/ttyS5"; 
+        "/dev/pts1";
 #endif
 
     try {
         SerialPort port(PORT_NAME);
         std::cout << "Listening on " << PORT_NAME << "...\n";
 
-        time_t lastHourCheck = getCurrentTime();
-        time_t lastDayCheck = getCurrentTime();
-
         while (true) {
-            std::string line = port.readLine(2000); // ждать до 2 сек
+            std::string line = port.readLine(2000);
             if (line.empty()) continue;
 
             float temp;
             if (!validatePacket(line, temp)) {
-                std::cerr << "Invalid data: " << line << "\n";
+                std::cerr << "Invalid  " << line << "\n";
                 continue;
             }
 
-            std::cout << "Received: " << temp << "°C\n";
-            logMeasurement(temp);
+            std::cout << "Received: " << temp << " C\n";
+            processTemperature(temp);
 
-            // === Проверка на смену часа ===
-            time_t now = getCurrentTime();
-            std::tm* tm_now = std::localtime(&now);
-            std::tm* tm_last = std::localtime(&lastHourCheck);
-
-            if (tm_now->tm_hour != tm_last->tm_hour) {
-                // Читаем все измерения за последний час
-                auto allMeasurements = readLogFile(MEASUREMENTS_FILE);
-                std::vector<float> lastHourTemps;
-                time_t hourStart = now - 3600;
-
-                for (const auto& [ts, t] : allMeasurements) {
-                    if (ts >= hourStart) {
-                        lastHourTemps.push_back(t);
-                    }
-                }
-
-                if (!lastHourTemps.empty()) {
-                    float sum = 0.0f;
-                    for (float t : lastHourTemps) sum += t;
-                    float hourlyAvg = sum / static_cast<float>(lastHourTemps.size());
-                    logHourlyAverage(hourlyAvg);
-                    std::cout << "[Hourly avg] " << hourlyAvg << "°C\n";
-                }
-
-                lastHourCheck = now;
-            }
-
-            // === Проверка на смену дня (в полночь) ===
-            std::tm* tm_day_last = std::localtime(&lastDayCheck);
-            if (tm_now->tm_yday != tm_day_last->tm_yday) {
-                // Рассчитываем среднее за вчерашний день
-                float dailyAvg = calculateYesterdayDailyAverage();
-                if (dailyAvg != 0.0f) {
-                    logDailyAverage(dailyAvg);
-                    std::cout << "[Daily avg] " << dailyAvg << "°C\n";
-                }
-                lastDayCheck = now;
-            }
-
-            // Небольшая задержка, чтобы не грузить CPU
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 

@@ -19,7 +19,7 @@ int main() {
 #ifdef _WIN32
         "COM6";  // эмулятор пишет в COM6
 #else
-        "/dev/ttyS6"; 
+        "/dev/pts2"; 
 #endif
 
     try {

@@ -77,7 +77,7 @@ SerialPort::SerialPort(const std::string& portName) {
     cfsetispeed(&tty, B9600);
 
     tty.c_cc[VMIN] = 0;       // Мин. количество символов для чтения
-    tty.c_cc[VTIME] = timeoutMs / 100; // Таймаут в десятках секунд
+    tty.c_cc[VTIME] = 10; // Таймаут 1 секунда
 
     if (tcsetattr(fd, TCSANOW, &tty) != 0) {
         close(fd);
