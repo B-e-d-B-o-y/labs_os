@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Temperature Monitor</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Temperature Monitor</h1>
+    <div>
+        <label>Start timestamp:</label>
+        <input id="start" value="0"/>
+        <label>End timestamp:</label>
+        <input id="end" value="9999999999"/>
+        <button onclick="loadData()">Load Data</button>
+    </div>
+    <canvas id="chart" width="800" height="400"></canvas>
+    <script>
+        let chart = null;
+        async function loadData() {
+            const start = document.getElementById('start').value;
+            const end = document.getElementById('end').value;
+            const res = await fetch(`/history?start=${start}&end=${end}`);
+            const data = await res.json();
+            const ctx = document.getElementById('chart').getContext('2d');
+            if (chart) chart.destroy();
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: data.measurements.map(m => ({x: m.timestamp, y: m.value})),
+                        borderColor: 'red',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: { 
+                            type: 'linear', 
+                            title: { display: true, text: 'Timestamp' } 
+                        },
+                        y: { 
+                            title: { display: true, text: 'Temp (°C)' } 
+                        }
+                    }
+                }
+            });
+            console.log('Average:', data.average);
+        }
+        loadData();
+    </script>
+</body>
+</html>
