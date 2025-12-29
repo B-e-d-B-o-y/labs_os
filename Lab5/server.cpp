@@ -389,7 +389,7 @@ void httpServerThread() {
 
     while (true) {
         sockaddr_in clientAddr;
-        int clientAddrSize = sizeof(clientAddr);
+        socklen_t clientAddrSize = sizeof(clientAddr);
         SOCKET clientSocket = accept(serverSocket, (sockaddr*)&clientAddr, &clientAddrSize);
         if (clientSocket == INVALID_SOCKET) continue;
 
