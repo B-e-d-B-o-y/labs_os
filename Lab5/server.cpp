@@ -32,7 +32,7 @@
 const char* DB_PATH = "temperature.db";
 const int HTTP_PORT = 8080;
 
-// ========== DATABASE ==========
+// DATABASE 
 
 bool initDatabase() {
     sqlite3* db;
@@ -181,7 +181,7 @@ std::string getLastMeasurementJSON() {
     return ss.str();
 }
 
-// ========== FILE READER ==========
+// FILE READER 
 
 std::string readFile(const std::string& path) {
     std::ifstream file(path);
@@ -192,7 +192,7 @@ std::string readFile(const std::string& path) {
                        std::istreambuf_iterator<char>());
 }
 
-// ========== SERIAL THREAD ==========
+// SERIAL THREAD 
 
 static std::vector<float> hourlyBuffer;
 static int totalMeasurements = 0;
@@ -246,7 +246,7 @@ void serialReaderThread() {
     }
 }
 
-// ========== URL & HTTP ==========
+// URL & HTTP 
 
 std::string urlDecode(const std::string& str) {
     std::string result;
@@ -408,7 +408,7 @@ void httpServerThread() {
 #endif
 }
 
-// ========== MAIN ==========
+// MAIN 
 
 int main() {
     if (!initDatabase()) {
