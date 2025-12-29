@@ -202,7 +202,7 @@ void serialReaderThread() {
 #ifdef _WIN32
         "COM5";
 #else
-        "/dev/ttyS5";
+        "/dev/pts/1";
 #endif
 
     try {
