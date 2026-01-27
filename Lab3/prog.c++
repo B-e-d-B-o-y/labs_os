@@ -141,8 +141,7 @@ void* copies_thread(void* /*arg*/) {
                     copy1_pid = -1;  // Копия завершилась
                 } else if (status == 0) {
                     do_log("WARNING: Copy 1 still running, skipping new launch");
-                    // Не запускаем новую копию
-                    continue;
+                    continue;  // Пропускаем запуск обеих копий
                 }
             }
             
@@ -152,8 +151,7 @@ void* copies_thread(void* /*arg*/) {
                     copy2_pid = -1;  // Копия завершилась
                 } else if (status == 0) {
                     do_log("WARNING: Copy 2 still running, skipping new launch");
-                    // Не запускаем новую копию
-                    continue;
+                    continue;  // Пропускаем запуск обеих копий
                 }
             }
             
@@ -243,12 +241,12 @@ int main(int argc, char* argv[]) {
         
         // === ОПРЕДЕЛЕНИЕ ГЛАВНОГО ПРОЦЕССА ===
         // Пытаемся захватить семафор БЕЗ БЛОКИРОВКИ
+        // Первый процесс, захвативший семафор, становится главным
         if (g_sem_master->try_wait()) {
             g_is_master = true;
-            // Обнуляем счётчик и сохраняем свой PID как главного
+            // Обнуляем счётчик ТОЛЬКО в главном процессе
             set_zero_shared_memory(g_shared_memory->get(), *g_sem_counter);
-            g_shared_memory->get()->master_pid = getpid();
-            g_sem_master->signal();  // Освобождаем семафор
+            g_sem_master->signal();  // Освобождаем семафор — флаг главенства сохранён в переменной
         } else {
             g_is_master = false;
         }

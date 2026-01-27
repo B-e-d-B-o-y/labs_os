@@ -1,11 +1,8 @@
 #pragma once
 #include <string>
-// Структура, лежащая в shared memory
 struct SharedMemoryData {
     int counter;
-    int master_pid;  // PID главного процесса
 };
-// Обёртка над разделяемой памятью
 class SharedMemory {
 public:
     explicit SharedMemory(const std::string& name);
@@ -22,14 +19,7 @@ private:
     void* hMapFile_ = nullptr;
 #endif
 };
-// Подключаем заголовок с определением SharedSemaphore ДО inline-функций
 #include "sem_mng.hpp"
-// Объявления inline-функций
-int get_counter(SharedMemoryData* memory, SharedSemaphore& sem);
-void set_counter(SharedMemoryData* memory, SharedSemaphore& sem, int value);
-void increment_counter(SharedMemoryData* memory, SharedSemaphore& sem);
-void set_zero_shared_memory(SharedMemoryData* memory, SharedSemaphore& sem);
-// --- Реализация inline-функций ---
 inline int get_counter(SharedMemoryData* memory, SharedSemaphore& sem) {
     sem.wait();
     int value = memory->counter;
@@ -49,6 +39,5 @@ inline void increment_counter(SharedMemoryData* memory, SharedSemaphore& sem) {
 inline void set_zero_shared_memory(SharedMemoryData* memory, SharedSemaphore& sem) {
     sem.wait();
     memory->counter = 0;
-    memory->master_pid = 0;  // Сбросим при инициализации
     sem.signal();
 }

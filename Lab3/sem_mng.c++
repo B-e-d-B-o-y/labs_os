@@ -6,19 +6,18 @@
 #else
 #include <semaphore.h>
 #include <fcntl.h>
-#include <errno.h>
 #endif
 
 SharedSemaphore::SharedSemaphore(const std::string& name)
 : name_(name)
 {
 #ifdef _WIN32
-    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: именованный семафор для кроссплатформенной работы
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: именованный семафор для кроссплатформенной работы!
     hSemaphore_ = CreateSemaphoreA(
         nullptr,
         1,         // начальное значение
         1,         // максимальное значение
-        name_.c_str()  // ИМЯ ОБЯЗАТЕЛЬНО!
+        name_.c_str()  // ← ИМЯ ОБЯЗАТЕЛЬНО!
     );
     if (!hSemaphore_) {
         throw std::runtime_error("CreateSemaphore failed, error: " +
@@ -41,7 +40,6 @@ SharedSemaphore::~SharedSemaphore() {
     if (sem_ && sem_ != SEM_FAILED) {
         sem_close(sem_);
         // ВАЖНО: НЕ вызываем sem_unlink() здесь!
-        // Семафор должен жить пока работает хотя бы один процесс
     }
 #endif
 }
