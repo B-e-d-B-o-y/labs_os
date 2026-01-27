@@ -13,19 +13,18 @@ SharedSemaphore::SharedSemaphore(const std::string& name)
 : name_(name)
 {
 #ifdef _WIN32
-    // ИСПРАВЛЕНО: используем ИМЕНОВАННЫЙ семафор для кроссплатформенной работы
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: именованный семафор для кроссплатформенной работы
     hSemaphore_ = CreateSemaphoreA(
-        nullptr,   // атрибуты безопасности
+        nullptr,
         1,         // начальное значение
         1,         // максимальное значение
-        name_.c_str()  // ← КРИТИЧЕСКИ ВАЖНО: имя для разделяемого семафора!
+        name_.c_str()  // ИМЯ ОБЯЗАТЕЛЬНО!
     );
     if (!hSemaphore_) {
         throw std::runtime_error("CreateSemaphore failed, error: " +
             std::to_string(GetLastError()));
     }
 #else
-    // Для POSIX: создаём семафор с начальным значением 1
     sem_ = sem_open(name_.c_str(), O_CREAT, 0644, 1);
     if (sem_ == SEM_FAILED) {
         throw std::runtime_error("sem_open failed");
@@ -42,8 +41,7 @@ SharedSemaphore::~SharedSemaphore() {
     if (sem_ && sem_ != SEM_FAILED) {
         sem_close(sem_);
         // ВАЖНО: НЕ вызываем sem_unlink() здесь!
-        // Удаление семафора происходит только при полной очистке системы,
-        // а не при завершении каждого процесса.
+        // Семафор должен жить пока работает хотя бы один процесс
     }
 #endif
 }
@@ -75,7 +73,6 @@ void SharedSemaphore::signal() {
 #endif
 }
 
-// Добавляем метод для попытки захвата без блокировки (для определения главного процесса)
 bool SharedSemaphore::try_wait() {
 #ifdef _WIN32
     DWORD res = WaitForSingleObject(hSemaphore_, 0); // 0 = немедленный возврат

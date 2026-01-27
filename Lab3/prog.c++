@@ -22,7 +22,7 @@ SharedMemory* g_shared_memory = nullptr;
 SharedSemaphore* g_sem_counter = nullptr;
 SharedSemaphore* g_sem_master = nullptr;
 std::string g_program_path;
-bool g_is_master = false;  // ← Флаг главного процесса
+bool g_is_master = false;
 
 void* increment_thread(void* /*arg*/) {
     while (true) {
@@ -186,7 +186,7 @@ void* copies_thread(void* /*arg*/) {
 void handle_copy_1() {
     do_log("COPY1_STARTED PID=" + std::to_string(getpid()) + " TIME=" + time_to_str());
     
-    // Увеличиваем счётчик на 10 (требование 5a)
+    // Увеличиваем счётчик на 10 АТОМАРНО (требование 5a)
     g_sem_counter->wait();
     g_shared_memory->get()->counter += 10;
     g_sem_counter->signal();
@@ -243,13 +243,12 @@ int main(int argc, char* argv[]) {
         
         // === ОПРЕДЕЛЕНИЕ ГЛАВНОГО ПРОЦЕССА ===
         // Пытаемся захватить семафор БЕЗ БЛОКИРОВКИ
-        // Первый процесс, захвативший семафор, становится главным
         if (g_sem_master->try_wait()) {
             g_is_master = true;
-            // Обнуляем счётчик ТОЛЬКО в главном процессе
+            // Обнуляем счётчик и сохраняем свой PID как главного
             set_zero_shared_memory(g_shared_memory->get(), *g_sem_counter);
-            // Освобождаем семафор — флаг главенства сохранён в переменной g_is_master
-            g_sem_master->signal();
+            g_shared_memory->get()->master_pid = getpid();
+            g_sem_master->signal();  // Освобождаем семафор
         } else {
             g_is_master = false;
         }

@@ -16,7 +16,7 @@ std::string time_to_str() {
     std::ostringstream oss;
 #ifdef _WIN32
     SYSTEMTIME st;
-    GetLocalTime(&st);  // Локальное время вместо UTC
+    GetLocalTime(&st);  // Локальное время
     oss << std::setfill('0')
         << std::setw(4) << st.wYear << '-'
         << std::setw(2) << st.wMonth << '-'
