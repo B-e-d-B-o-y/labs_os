@@ -1,29 +1,22 @@
-#include <iostream>      // std::cerr
-#include <fstream>       // std::ofstream
-#include <string>        // std::string
-#include <sstream>       // std::ostringstream
-#include <chrono>
-#include <iomanip>       // std::setfill, std::setw
-#include <ctime>         // std::tm
-
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
 #ifdef _WIN32
-#include <windows.h>     // SYSTEMTIME, GetSystemTime, GetCurrentProcessId
+#include <windows.h>
 #else
-#include <unistd.h>      // getpid
-#include <sys/time.h>    // gettimeofday
+#include <unistd.h>
+#include <sys/time.h>
 #endif
+#include "time_log.hpp"
 
-#include "time_log.hpp"  // объявления time_to_str и do_log
-
-// Кроссплатформенная функция формирования строки времени с точностью до миллисекунд
 std::string time_to_str() {
-    std::ostringstream oss; // Для удобного форматирования строки
-
+    std::ostringstream oss;
 #ifdef _WIN32
     SYSTEMTIME st;
-    GetSystemTime(&st); // Получаем текущее время с миллисекундами
-
-    // Форматируем дату и время с ведущими нулями
+    GetLocalTime(&st);  // Локальное время вместо UTC
     oss << std::setfill('0')
         << std::setw(4) << st.wYear << '-'
         << std::setw(2) << st.wMonth << '-'
@@ -34,12 +27,9 @@ std::string time_to_str() {
         << std::setw(3) << st.wMilliseconds;
 #else
     struct timeval tv;
-    gettimeofday(&tv, nullptr); // Текущее время, включая микросекунды
-
+    gettimeofday(&tv, nullptr);
     std::tm t;
-    localtime_r(&tv.tv_sec, &t); // Перевод в локальное время
-
-    // Форматирование аналогично Windows
+    localtime_r(&tv.tv_sec, &t);
     oss << std::setfill('0')
         << std::setw(4) << t.tm_year + 1900 << '-'
         << std::setw(2) << t.tm_mon + 1 << '-'
@@ -52,20 +42,20 @@ std::string time_to_str() {
     return oss.str();
 }
 
-// Логирование события в файл с проставлением времени и PID
 void do_log(const std::string& data) {
-    std::ofstream file("log.txt", std::ios::app); // Открываем лог-файл для дозаписи
-    if (!file.is_open()) {
-        std::cerr << "Failed to open log file" << std::endl;
-        return;
-    }
-
 #ifdef _WIN32
     int pid = static_cast<int>(GetCurrentProcessId());
 #else
     int pid = static_cast<int>(getpid());
 #endif
-
-    // Пишем в лог: [PID] время: текст лога
-    file << "[" << pid << "] " << time_to_str() << ": " << data << std::endl;
+    
+    // Кроссплатформенная блокировка файла
+    std::ofstream file("lab3.log", std::ios::app);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open log file" << std::endl;
+        return;
+    }
+    
+    file << "[" << time_to_str() << "] PID=" << pid << ": " << data << std::endl;
+    file.flush();
 }

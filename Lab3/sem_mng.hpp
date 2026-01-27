@@ -6,20 +6,19 @@
 #include <semaphore.h>
 #endif
 
-// Класс семафора для синхронизации доступа к shared memory
 class SharedSemaphore {
 public:
     explicit SharedSemaphore(const std::string& name);
     SharedSemaphore(const SharedSemaphore&) = delete;
     SharedSemaphore& operator=(const SharedSemaphore&) = delete;
     ~SharedSemaphore();
-    void wait();   // захват
-    void signal(); // освобождение
-
+    void wait();
+    void signal();
+    bool try_wait();  // ← НОВЫЙ МЕТОД: попытка захвата без блокировки
 private:
     std::string name_;
 #ifdef _WIN32
-    void* hSemaphore_ = nullptr; // HANDLE
+    void* hSemaphore_ = nullptr;
 #else
     sem_t* sem_ = nullptr;
 #endif
