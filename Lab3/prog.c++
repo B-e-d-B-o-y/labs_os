@@ -3,30 +3,35 @@
 #include <cstdlib>
 #include <string>
 #include <cstring>
+
 #ifdef _WIN32
 #include <windows.h>
 #else
 #include <unistd.h>
-#include <sys/wait.h>
+#include <cstring>
 #endif
+
 #include "time_log.hpp"
 #include "sem_mng.hpp"
 #include "mem_shr.hpp"
 #include "thr.hpp"
-#include <process.h>
 
-#define SEM_NAME_MASTER "/lab3_master_sem"
-#define LOG_FILE "lab3.log"
-
+// Глобальные указатели на разделяемую память и семафор
 SharedMemory* g_shared_memory = nullptr;
 SharedSemaphore* g_sem_counter = nullptr;
-SharedSemaphore* g_sem_master = nullptr;
-std::string g_program_path;
-bool g_is_master = false;
 
+// Глобальная переменная для определения главного процесса
+static bool g_is_master = false;
+static int g_master_lock_fd = -1;
+
+// Путь к программе (для копий)
+std::string g_program_path;
+
+// Поток, увеличивающий счётчик каждые 300 мс
 void* increment_thread(void* /*arg*/) {
+    auto* data = g_shared_memory->get();
     while (true) {
-        increment_counter(g_shared_memory->get(), *g_sem_counter);
+        increment_counter(data, *g_sem_counter);
 #ifdef _WIN32
         Sleep(300);
 #else
@@ -36,14 +41,16 @@ void* increment_thread(void* /*arg*/) {
     return nullptr;
 }
 
+// Функция для записи времени и значения счётчика в лог
 void log_counter() {
-    int counter_val = get_counter(g_shared_memory->get(), *g_sem_counter);
-    char buf[128];
-    std::snprintf(buf, sizeof(buf), "TIME=%s PID=%d COUNTER=%d",
-        time_to_str().c_str(), getpid(), counter_val);
+    auto* data = g_shared_memory->get();
+    int counter_val = get_counter(data, *g_sem_counter);
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "Counter value: %d", counter_val);
     do_log(buf);
 }
 
+// Поток, записывающий значение счётчика в лог каждую секунду (только главный процесс)
 void* log_thread(void* /*arg*/) {
     while (true) {
         if (g_is_master) {
@@ -58,257 +65,345 @@ void* log_thread(void* /*arg*/) {
     return nullptr;
 }
 
+// Поток, обрабатывающий пользовательский ввод
 void* input_thread(void* /*arg*/) {
+    auto* data = g_shared_memory->get();
     int new_value = 0;
     while (true) {
-        std::printf("\n[PID %d] Enter new counter value (or 'q' to quit): ", getpid());
-        char input[32];
-        if (std::scanf("%31s", input) != 1) continue;
-        
-        if (input[0] == 'q' || input[0] == 'Q') {
-            std::printf("Exiting process PID %d...\n", getpid());
-            std::exit(0);
-        }
-        
-        try {
-            new_value = std::stoi(input);
-            set_counter(g_shared_memory->get(), *g_sem_counter, new_value);
-            std::printf("[PID %d] Counter set to %d\n", getpid(), new_value);
-        } catch (...) {
-            std::printf("[PID %d] Invalid input. Enter an integer.\n", getpid());
-            while (std::getchar() != '\n' && !std::feof(stdin));
+        std::printf("Enter a new counter value: ");
+        if (std::scanf("%d", &new_value) == 1) {
+            set_counter(data, *g_sem_counter, new_value);
+            std::printf("Counter updated to %d\n", new_value);
+        } else {
+            std::printf("Invalid input. Please enter an integer.\n");
+            int c;
+            while ((c = std::getchar()) != '\n' && c != EOF) {
+                // чистим буфер
+            }
         }
     }
     return nullptr;
 }
 
+// Обработка SIGINT 
 void handle_signal(int /*sig*/) {
-    std::printf("\n[PID %d] Shutting down...\n", getpid());
+    std::printf("Shutdown...\n");
+    try {
+        // Если мы главный процесс, освобождаем блокировку
+        if (g_is_master) {
+#ifdef _WIN32
+            // В Windows используем именованный мьютекс для блокировки
+            HANDLE hMutex = CreateMutexA(nullptr, FALSE, "Global\\Lab3MasterMutex");
+            if (hMutex) {
+                ReleaseMutex(hMutex);
+                CloseHandle(hMutex);
+            }
+#else
+            // В POSIX освобождаем файловую блокировку
+            if (g_master_lock_fd != -1) {
+                struct flock lock = {0};
+                lock.l_type = F_UNLCK;
+                lock.l_whence = SEEK_SET;
+                fcntl(g_master_lock_fd, F_SETLK, &lock);
+                close(g_master_lock_fd);
+            }
+#endif
+        }
+    } catch (...) {
+        // Игнор ошибок при завершении
+    }
     std::exit(0);
 }
 
+// Создание копии программы с параметром (--copy1 или --copy2)
 int create_copy(const char* param) {
 #ifdef _WIN32
     char program_path[MAX_PATH];
     if (GetModuleFileNameA(nullptr, program_path, MAX_PATH) == 0) {
-        std::printf("Failed to get program path\n");
+        std::printf("Failed to get the program path\n");
         return -1;
     }
+
     char command_line[MAX_PATH + 256];
     std::snprintf(command_line, sizeof(command_line), "\"%s\" %s", program_path, param);
-    
+
     STARTUPINFOA si{};
     PROCESS_INFORMATION pi{};
     si.cb = sizeof(si);
-    if (!CreateProcessA(nullptr, command_line, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi)) {
-        std::printf("CreateProcess failed, error: %lu\n", GetLastError());
+
+    if (!CreateProcessA(
+            nullptr,
+            command_line,
+            nullptr,
+            nullptr,
+            FALSE,
+            0,
+            nullptr,
+            nullptr,
+            &si,
+            &pi)) {
+        std::printf("Failed to create process\n");
         return -1;
     }
+
     CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
     return static_cast<int>(pi.dwProcessId);
+
 #else
-    pid_t pid = fork();
+    int pid = fork();
     if (pid == 0) {
-        char* args[] = { const_cast<char*>(g_program_path.c_str()), const_cast<char*>(param), nullptr };
+        char* args[] = { const_cast<char*>(g_program_path.c_str()),
+                         const_cast<char*>(param),
+                         nullptr };
         execv(g_program_path.c_str(), args);
-        std::perror("execv failed");
+        std::perror("execv");
         std::exit(1);
     } else if (pid < 0) {
-        std::perror("fork failed");
+        std::printf("Failed to create child process\n");
         return -1;
     }
-    return static_cast<int>(pid);
+    return pid;
 #endif
 }
 
+// Поток, который раз в 3 секунды создаёт две копии программы (только главный процесс)
 void* copies_thread(void* /*arg*/) {
-    int copy1_pid = -1;
-    int copy2_pid = -1;
-    
+    int copy_1_pid = 0;
+    int copy_2_pid = 0;
+
     while (true) {
-        // Ждём 3 секунды ДО проверки и запуска копий (требование 5)
         if (g_is_master) {
-#ifdef _WIN32
-            Sleep(3000);
-#else
-            sleep(3);
-#endif
-            
-            // Проверяем завершение предыдущих копий (требование 5c)
-            if (copy1_pid != -1) {
-                int status = check_process_finished(copy1_pid);
+            if (copy_1_pid == 0) {
+                copy_1_pid = create_copy("--copy1");
+                if (copy_1_pid == -1) {
+                    do_log("Failed to launch Copy 1");
+                }
+            } else {
+                int status = check_process_finished(copy_1_pid);
                 if (status == 1) {
-                    copy1_pid = -1;  // Копия завершилась
+                    copy_1_pid = 0;
                 } else if (status == 0) {
-                    do_log("WARNING: Copy 1 still running, skipping new launch");
-                    continue;  // Пропускаем запуск обеих копий
+                    do_log("Copy 1 is still active. Skipping launch.");
                 }
             }
-            
-            if (copy2_pid != -1) {
-                int status = check_process_finished(copy2_pid);
+
+            if (copy_2_pid == 0) {
+                copy_2_pid = create_copy("--copy2");
+                if (copy_2_pid == -1) {
+                    do_log("Failed to launch Copy 2");
+                }
+            } else {
+                int status = check_process_finished(copy_2_pid);
                 if (status == 1) {
-                    copy2_pid = -1;  // Копия завершилась
+                    copy_2_pid = 0;
                 } else if (status == 0) {
-                    do_log("WARNING: Copy 2 still running, skipping new launch");
-                    continue;  // Пропускаем запуск обеих копий
+                    do_log("Copy 2 is still active. Skipping launch.");
                 }
             }
-            
-            // Запускаем копии ТОЛЬКО если предыдущие завершились
-            if (copy1_pid == -1) {
-                copy1_pid = create_copy("--copy1");
-                if (copy1_pid != -1) {
-                    do_log("Launched copy 1 (PID=" + std::to_string(copy1_pid) + ")");
-                }
-            }
-            
-            if (copy2_pid == -1) {
-                copy2_pid = create_copy("--copy2");
-                if (copy2_pid != -1) {
-                    do_log("Launched copy 2 (PID=" + std::to_string(copy2_pid) + ")");
-                }
-            }
-        } else {
-            // Не-главный процесс ждёт 3 секунды и ничего не делает
+        }
+
 #ifdef _WIN32
-            Sleep(3000);
+        Sleep(3000);
 #else
-            sleep(3);
+        sleep(3);
 #endif
+
+        // Проверяем завершение процессов
+        if (copy_1_pid != 0) {
+            int status = check_process_finished(copy_1_pid);
+            if (status == 1) copy_1_pid = 0;
+        }
+        if (copy_2_pid != 0) {
+            int status = check_process_finished(copy_2_pid);
+            if (status == 1) copy_2_pid = 0;
         }
     }
     return nullptr;
 }
 
+// Логика копии 1
 void handle_copy_1() {
-    do_log("COPY1_STARTED PID=" + std::to_string(getpid()) + " TIME=" + time_to_str());
+    auto* data = g_shared_memory->get();
+    do_log("(Copy1) Started");
+    increment_counter(data, *g_sem_counter); // +1
     
-    // Увеличиваем счётчик на 10 АТОМАРНО (требование 5a)
-    g_sem_counter->wait();
-    g_shared_memory->get()->counter += 10;
-    g_sem_counter->signal();
-    
-    do_log("COPY1_EXIT PID=" + std::to_string(getpid()) + " TIME=" + time_to_str());
+    for (int i = 0; i < 9; ++i) {
+        increment_counter(data, *g_sem_counter);
+    }
+    do_log("(Copy1) Exit");
     std::exit(0);
 }
 
+// Логика копии 2
 void handle_copy_2() {
-    do_log("COPY2_STARTED PID=" + std::to_string(getpid()) + " TIME=" + time_to_str());
-    
-    // Увеличиваем счётчик в 2 раза (требование 5b)
+    auto* data = g_shared_memory->get();
+    do_log("(Copy2) Started");
+
+    // *2
     g_sem_counter->wait();
-    g_shared_memory->get()->counter *= 2;
+    data->counter *= 2;
     g_sem_counter->signal();
-    
-    // Ждём 2 секунды
+
 #ifdef _WIN32
     Sleep(2000);
 #else
-    sleep(2);
+    usleep(2000 * 1000);
 #endif
-    
-    // Уменьшаем счётчик в 2 раза
+
+    // /2
     g_sem_counter->wait();
-    g_shared_memory->get()->counter /= 2;
+    if (data->counter % 2 == 0) {
+        data->counter /= 2;
+    } else {
+        // Если нечётное, сохраняем в целых числах
+        data->counter = data->counter / 2;
+    }
     g_sem_counter->signal();
-    
-    do_log("COPY2_EXIT PID=" + std::to_string(getpid()) + " TIME=" + time_to_str());
+
+    do_log("(Copy2) Exit");
     std::exit(0);
+}
+
+// Функция для получения PID процесса
+int get_current_pid() {
+#ifdef _WIN32
+    return static_cast<int>(GetCurrentProcessId());
+#else
+    return static_cast<int>(getpid());
+#endif
+}
+
+// Попытка стать главным процессом
+bool try_become_master() {
+#ifdef _WIN32
+    // В Windows используем именованный мьютекс для блокировки
+    HANDLE hMutex = CreateMutexA(nullptr, FALSE, "Global\\Lab3MasterMutex");
+    if (hMutex == nullptr) {
+        return false;
+    }
+    
+    // Пытаемся захватить мьютекс без ожидания
+    DWORD waitResult = WaitForSingleObject(hMutex, 0);
+    if (waitResult == WAIT_OBJECT_0) {
+        // Успешно стали главными
+        return true;
+    } else if (waitResult == WAIT_ABANDONED) {
+        // Мьютекс был оставлен другим процессом, мы становимся главными
+        return true;
+    }
+    
+    CloseHandle(hMutex);
+    return false;
+#else
+    // В POSIX используем файловую блокировку
+    g_master_lock_fd = open("/tmp/lab3_master.lock", O_CREAT | O_RDWR, 0666);
+    if (g_master_lock_fd == -1) {
+        return false;
+    }
+    
+    struct flock lock = {0};
+    lock.l_type = F_WRLCK;
+    lock.l_whence = SEEK_SET;
+    lock.l_start = 0;
+    lock.l_len = 0; // блокируем весь файл
+    
+    // Неблокирующая попытка захвата блокировки
+    if (fcntl(g_master_lock_fd, F_SETLK, &lock) != -1) {
+        return true;
+    }
+    
+    close(g_master_lock_fd);
+    g_master_lock_fd = -1;
+    return false;
+#endif
 }
 
 int main(int argc, char* argv[]) {
     try {
-        // Инициализация разделяемых ресурсов
-        SharedMemory shm("/lab3_shared_memory");
-        SharedSemaphore sem_counter("/lab3_counter_sem");
-        SharedSemaphore sem_master(SEM_NAME_MASTER);
+        // Получаем PID процесса
+        int pid = get_current_pid();
+        char buf[128];
+        std::snprintf(buf, sizeof(buf), "Process started (PID: %d)", pid);
+        do_log(buf);
         
+        // Инициализация разделяемой памяти и семафора для счётчика
+        SharedMemory shm("/my_shared_memory");
+        SharedSemaphore sem_counter("/shared_memory_semaphore");
         g_shared_memory = &shm;
         g_sem_counter = &sem_counter;
-        g_sem_master = &sem_master;
-        g_program_path = argv[0];
-        
-        // Если запущен как копия
+
+        auto* data = g_shared_memory->get();
+
+        // Инициализируем разделяемую память, если это первый запуск
+        if (!is_initialized(data, *g_sem_counter)) {
+            set_zero_shared_memory(data, *g_sem_counter);
+            mark_initialized(data, *g_sem_counter);
+        }
+
+        // Если процесс запущен как копия
         if (argc > 1) {
             if (strcmp(argv[1], "--copy1") == 0) {
                 handle_copy_1();
             } else if (strcmp(argv[1], "--copy2") == 0) {
                 handle_copy_2();
             }
-            return 0;
         }
+
+        g_program_path = argv[0];
+
+        // Пытаемся стать главным процессом
+        g_is_master = try_become_master();
         
-        // === ОПРЕДЕЛЕНИЕ ГЛАВНОГО ПРОЦЕССА ===
-        // Пытаемся захватить семафор БЕЗ БЛОКИРОВКИ
-        // Первый процесс, захвативший семафор, становится главным
-        if (g_sem_master->try_wait()) {
-            g_is_master = true;
-            // Обнуляем счётчик ТОЛЬКО в главном процессе
-            set_zero_shared_memory(g_shared_memory->get(), *g_sem_counter);
-            g_sem_master->signal();  // Освобождаем семафор — флаг главенства сохранён в переменной
-        } else {
-            g_is_master = false;
-        }
-        
-        // === ВЫВОД СТАТУСА В КОНСОЛЬ ===
-        std::printf("\n");
-        std::printf("========================================\n");
-        std::printf(" Process ID: %d\n", getpid());
         if (g_is_master) {
-            std::printf(" Status:     [MAIN PROCESS] ✅\n");
-            std::printf(" Role:       Logs counter + launches copies\n");
+            do_log("I'm master process");
+            std::signal(SIGINT, handle_signal);
         } else {
-            std::printf(" Status:     [AUXILIARY PROCESS] ⚙️\n");
-            std::printf(" Role:       Modifies counter only\n");
+            do_log("I'm client process");
         }
-        std::printf("========================================\n");
-        std::printf("\n");
-        
-        // Запись в лог при старте с PID и временем (требование 1)
-        char start_msg[128];
-        std::snprintf(start_msg, sizeof(128), "PROCESS_STARTED PID=%d TIME=%s IS_MASTER=%s",
-            getpid(), time_to_str().c_str(), g_is_master ? "YES" : "NO");
-        do_log(start_msg);
-        
-        // Установка обработчика сигналов
-        std::signal(SIGINT, handle_signal);
-#ifndef _WIN32
-        std::signal(SIGTERM, handle_signal);
-#endif
-        
-        // Запуск потоков
-        thread_t inc_thread{}, logger_thread{}, inp_thread{}, cop_thread{};
+
+        // Запускаем потоки, которые есть у всех процессов
+        thread_t inc_thread{};
+        thread_t inp_thread{};
         
         if (thread_create(&inc_thread, increment_thread, nullptr) != 0) {
-            std::perror("Failed to create increment thread");
+            std::perror("increment_thread");
             return 1;
         }
-        if (thread_create(&logger_thread, log_thread, nullptr) != 0) {
-            std::perror("Failed to create logger thread");
-            return 1;
-        }
+
         if (thread_create(&inp_thread, input_thread, nullptr) != 0) {
-            std::perror("Failed to create input thread");
+            std::perror("input_thread");
             return 1;
         }
-        if (thread_create(&cop_thread, copies_thread, nullptr) != 0) {
-            std::perror("Failed to create copies thread");
-            return 1;
-        }
+
+        // Запускаем потоки, которые есть только у главного процесса
+        thread_t logger_thread{};
+        thread_t cop_thread{};
         
-        // Основной цикл — ожидание ввода пользователя
-        while (true) {
-#ifdef _WIN32
-            Sleep(100);
-#else
-            usleep(100000);
-#endif
+        if (g_is_master) {
+            if (thread_create(&logger_thread, log_thread, nullptr) != 0) {
+                std::perror("log_thread");
+                return 1;
+            }
+
+            if (thread_create(&cop_thread, copies_thread, nullptr) != 0) {
+                std::perror("copies_thread");
+                return 1;
+            }
         }
+
+        // Ждём потоки
+        thread_join(inc_thread);
+        thread_join(inp_thread);
         
+        if (g_is_master) {
+            thread_join(logger_thread);
+            thread_join(cop_thread);
+        }
     } catch (const std::exception& ex) {
         std::fprintf(stderr, "Error: %s\n", ex.what());
         return 1;
     }
+
     return 0;
 }
