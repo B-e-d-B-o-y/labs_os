@@ -9,6 +9,7 @@
 #else
 #include <unistd.h>
 #include <cstring>
+#include <fcntl.h>
 #endif
 
 #include "time_log.hpp"
@@ -22,7 +23,8 @@ SharedSemaphore* g_sem_counter = nullptr;
 
 // Глобальная переменная для определения главного процесса
 static bool g_is_master = false;
-static int g_master_lock_fd = -1;
+static void* g_hMasterMutex = nullptr; // Для Windows
+static int g_master_lock_fd = -1; // Для Linux
 
 // Путь к программе (для копий)
 std::string g_program_path;
@@ -70,12 +72,12 @@ void* input_thread(void* /*arg*/) {
     auto* data = g_shared_memory->get();
     int new_value = 0;
     while (true) {
-        std::printf("Enter a new counter value: ");
+        std::printf("Введите новое значение счетчика: ");
         if (std::scanf("%d", &new_value) == 1) {
             set_counter(data, *g_sem_counter, new_value);
-            std::printf("Counter updated to %d\n", new_value);
+            std::printf("Счетчик обновлен до %d\n", new_value);
         } else {
-            std::printf("Invalid input. Please enter an integer.\n");
+            std::printf("Неверный ввод. Пожалуйста, введите целое число.\n");
             int c;
             while ((c = std::getchar()) != '\n' && c != EOF) {
                 // чистим буфер
@@ -87,25 +89,24 @@ void* input_thread(void* /*arg*/) {
 
 // Обработка SIGINT 
 void handle_signal(int /*sig*/) {
-    std::printf("Shutdown...\n");
+    std::printf("Завершение работы...\n");
     try {
         // Если мы главный процесс, освобождаем блокировку
         if (g_is_master) {
 #ifdef _WIN32
-            // В Windows используем именованный мьютекс для блокировки
-            HANDLE hMutex = CreateMutexA(nullptr, FALSE, "Global\\Lab3MasterMutex");
-            if (hMutex) {
-                ReleaseMutex(hMutex);
-                CloseHandle(hMutex);
+            if (g_hMasterMutex) {
+                ReleaseMutex(g_hMasterMutex);
+                CloseHandle(g_hMasterMutex);
+                g_hMasterMutex = nullptr;
             }
 #else
-            // В POSIX освобождаем файловую блокировку
             if (g_master_lock_fd != -1) {
                 struct flock lock = {0};
                 lock.l_type = F_UNLCK;
                 lock.l_whence = SEEK_SET;
                 fcntl(g_master_lock_fd, F_SETLK, &lock);
                 close(g_master_lock_fd);
+                g_master_lock_fd = -1;
             }
 #endif
         }
@@ -120,7 +121,7 @@ int create_copy(const char* param) {
 #ifdef _WIN32
     char program_path[MAX_PATH];
     if (GetModuleFileNameA(nullptr, program_path, MAX_PATH) == 0) {
-        std::printf("Failed to get the program path\n");
+        std::printf("Не удалось получить путь к программе\n");
         return -1;
     }
 
@@ -142,7 +143,7 @@ int create_copy(const char* param) {
             nullptr,
             &si,
             &pi)) {
-        std::printf("Failed to create process\n");
+        std::printf("Не удалось создать процесс\n");
         return -1;
     }
 
@@ -160,7 +161,7 @@ int create_copy(const char* param) {
         std::perror("execv");
         std::exit(1);
     } else if (pid < 0) {
-        std::printf("Failed to create child process\n");
+        std::printf("Не удалось создать дочерний процесс\n");
         return -1;
     }
     return pid;
@@ -278,13 +279,13 @@ int get_current_pid() {
 bool try_become_master() {
 #ifdef _WIN32
     // В Windows используем именованный мьютекс для блокировки
-    HANDLE hMutex = CreateMutexA(nullptr, FALSE, "Global\\Lab3MasterMutex");
-    if (hMutex == nullptr) {
+    g_hMasterMutex = CreateMutexA(nullptr, FALSE, "Global\\Lab3MasterMutex");
+    if (g_hMasterMutex == nullptr) {
         return false;
     }
     
     // Пытаемся захватить мьютекс без ожидания
-    DWORD waitResult = WaitForSingleObject(hMutex, 0);
+    DWORD waitResult = WaitForSingleObject(g_hMasterMutex, 0);
     if (waitResult == WAIT_OBJECT_0) {
         // Успешно стали главными
         return true;
@@ -293,7 +294,9 @@ bool try_become_master() {
         return true;
     }
     
-    CloseHandle(hMutex);
+    // Не удалось стать главным, освобождаем ресурсы
+    CloseHandle(g_hMasterMutex);
+    g_hMasterMutex = nullptr;
     return false;
 #else
     // В POSIX используем файловую блокировку
@@ -321,6 +324,11 @@ bool try_become_master() {
 
 int main(int argc, char* argv[]) {
     try {
+        // Устанавливаем UTF-8 для Windows
+#ifdef _WIN32
+        SetConsoleOutputCP(CP_UTF8);
+#endif
+        
         // Получаем PID процесса
         int pid = get_current_pid();
         char buf[128];
@@ -355,12 +363,20 @@ int main(int argc, char* argv[]) {
         // Пытаемся стать главным процессом
         g_is_master = try_become_master();
         
+        // ВЫВОДИМ СТАТУС В КОНСОЛЬ
         if (g_is_master) {
+            std::printf("=== СТАТУС: ГЛАВНЫЙ процесс (PID: %d) ===\n", pid);
+            std::printf("Я буду записывать значение счетчика в лог каждую секунду\n");
+            std::printf("и создавать копии каждые 3 секунды.\n");
             do_log("I'm master process");
             std::signal(SIGINT, handle_signal);
         } else {
+            std::printf("=== СТАТУС: ВТОРОСТЕПЕННЫЙ процесс (PID: %d) ===\n", pid);
+            std::printf("Я буду только изменять счетчик (каждые 300мс и по вводу пользователя).\n");
             do_log("I'm client process");
         }
+        
+        std::printf("Нажмите Ctrl+C для выхода.\n\n");
 
         // Запускаем потоки, которые есть у всех процессов
         thread_t inc_thread{};
@@ -401,7 +417,7 @@ int main(int argc, char* argv[]) {
             thread_join(cop_thread);
         }
     } catch (const std::exception& ex) {
-        std::fprintf(stderr, "Error: %s\n", ex.what());
+        std::fprintf(stderr, "Ошибка: %s\n", ex.what());
         return 1;
     }
 
