@@ -70,12 +70,12 @@ void* input_thread(void* /*arg*/) {
     auto* data = g_shared_memory->get();
     int new_value = 0;
     while (true) {
-        std::printf("Введите новое значение счетчика: ");
+        std::printf("Enter a new counter value: ");
         if (std::scanf("%d", &new_value) == 1) {
             set_counter(data, *g_sem_counter, new_value);
-            std::printf("Счетчик обновлен до %d\n", new_value);
+            std::printf("Counter updated to %d\n", new_value);
         } else {
-            std::printf("Неверный ввод. Пожалуйста, введите целое число.\n");
+            std::printf("Invalid input. Please enter an integer.\n");
             int c;
             while ((c = std::getchar()) != '\n' && c != EOF) {
                 // чистим буфер
@@ -87,7 +87,7 @@ void* input_thread(void* /*arg*/) {
 
 // Обработка SIGINT 
 void handle_signal(int /*sig*/) {
-    std::printf("Завершение работы...\n");
+    std::printf("Shutdown...\n");
     try {
         // Если мы главный процесс, освобождаем блокировку
         if (g_is_master) {
@@ -120,7 +120,7 @@ int create_copy(const char* param) {
 #ifdef _WIN32
     char program_path[MAX_PATH];
     if (GetModuleFileNameA(nullptr, program_path, MAX_PATH) == 0) {
-        std::printf("Не удалось получить путь к программе\n");
+        std::printf("Failed to get the program path\n");
         return -1;
     }
 
@@ -142,7 +142,7 @@ int create_copy(const char* param) {
             nullptr,
             &si,
             &pi)) {
-        std::printf("Не удалось создать процесс\n");
+        std::printf("Failed to create process\n");
         return -1;
     }
 
@@ -160,7 +160,7 @@ int create_copy(const char* param) {
         std::perror("execv");
         std::exit(1);
     } else if (pid < 0) {
-        std::printf("Не удалось создать дочерний процесс\n");
+        std::printf("Failed to create child process\n");
         return -1;
     }
     return pid;
@@ -287,12 +287,9 @@ bool try_become_master() {
     DWORD waitResult = WaitForSingleObject(hMutex, 0);
     if (waitResult == WAIT_OBJECT_0) {
         // Успешно стали главными
-        // Закрываем handle, но мьютекс остаётся захваченным
-        CloseHandle(hMutex);
         return true;
     } else if (waitResult == WAIT_ABANDONED) {
         // Мьютекс был оставлен другим процессом, мы становимся главными
-        CloseHandle(hMutex);
         return true;
     }
     
@@ -324,11 +321,6 @@ bool try_become_master() {
 
 int main(int argc, char* argv[]) {
     try {
-        // Устанавливаем UTF-8 для Windows
-#ifdef _WIN32
-        SetConsoleOutputCP(CP_UTF8);
-#endif
-        
         // Получаем PID процесса
         int pid = get_current_pid();
         char buf[128];
@@ -363,20 +355,12 @@ int main(int argc, char* argv[]) {
         // Пытаемся стать главным процессом
         g_is_master = try_become_master();
         
-        // ВЫВОДИМ СТАТУС В КОНСОЛЬ
         if (g_is_master) {
-            std::printf("=== СТАТУС: ГЛАВНЫЙ процесс (PID: %d) ===\n", pid);
-            std::printf("Я буду записывать значение счетчика в лог каждую секунду\n");
-            std::printf("и создавать копии каждые 3 секунды.\n");
             do_log("I'm master process");
             std::signal(SIGINT, handle_signal);
         } else {
-            std::printf("=== СТАТУС: ВТОРОСТЕПЕННЫЙ процесс (PID: %d) ===\n", pid);
-            std::printf("Я буду только изменять счетчик (каждые 300мс и по вводу пользователя).\n");
             do_log("I'm client process");
         }
-        
-        std::printf("Нажмите Ctrl+C для выхода.\n\n");
 
         // Запускаем потоки, которые есть у всех процессов
         thread_t inc_thread{};
@@ -417,7 +401,7 @@ int main(int argc, char* argv[]) {
             thread_join(cop_thread);
         }
     } catch (const std::exception& ex) {
-        std::fprintf(stderr, "Ошибка: %s\n", ex.what());
+        std::fprintf(stderr, "Error: %s\n", ex.what());
         return 1;
     }
 
